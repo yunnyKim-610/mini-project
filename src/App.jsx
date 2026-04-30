@@ -1,122 +1,222 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
-function App() {
-  const [count, setCount] = useState(0)
+
+//  상수 
+const MODES = {
+  focus: { label: '집중', duration: 25 * 60, key: 'focus' },
+  break: { label: '휴식', duration: 5 * 60, key: 'break' },
+}
+const COLOR = {
+  bg: '#0e0e0e',
+  surface: '#161616',
+  surface2: '#1f1f1f',
+  border: '#2a2a2a',
+  text: '#ebe7e1',
+  textMuted: '#6b6560',
+  accentFocus: '#e4f0e5',
+  accentBreak: '#e6ebf1',
+  accentFocusDim: 'rgba(22, 82, 22, 0.1)',
+  accentBreakDim: 'rgba(154, 184, 232, 0.12)',
+}
+//  유틸 
+function pad(n) {
+  return String(n).padStart(2, '0')
+}
+
+function formatTime(seconds) {
+  const m = Math.floor(seconds / 60)
+  const s = seconds % 60
+  return `${pad(m)}:${pad(s)}`
+}
+
+//  컴포넌트 
+export default function App() {
+  const [mode, setMode] = useState('focus')           
+  const [timeLeft, setTimeLeft] = useState(MODES.focus.duration)
+  const [running, setRunning] = useState(false)
+  const [sessions, setSessions] = useState(0)         
+  const [flash, setFlash] = useState(false)           
+
+  const intervalRef = useRef(null)
+  const currentMode = MODES[mode]
+  const totalDuration = currentMode.duration
+  const progress = 1 - timeLeft / totalDuration       // 0 → 1
+
+  // 타이머 
+  const tick = useCallback(() => {
+    setTimeLeft(prev => {
+      if (prev <= 1) {
+       
+        setRunning(false)
+        triggerModeSwitch()
+        return 0
+      }
+      return prev - 1
+    })
+  }, [])
+
+  useEffect(() => {
+    if (running) {
+      intervalRef.current = setInterval(tick, 1000)
+    } else {
+      clearInterval(intervalRef.current)
+    }
+    return () => clearInterval(intervalRef.current)
+  }, [running, tick])
+
+  //  모드 전환 
+  function triggerModeSwitch() {
+    setFlash(true)
+    setTimeout(() => {
+      setMode(prev => {
+        const next = prev === 'focus' ? 'break' : 'focus'
+        setTimeLeft(MODES[next].duration)
+        if (prev === 'focus') setSessions(s => s + 1)
+        return next
+      })
+      setFlash(false)
+    }, 600)
+  }
+
+  function switchMode(next) {
+    if (next === mode) return
+    setRunning(false)
+    setFlash(true)
+    setTimeout(() => {
+      setMode(next)
+      setTimeLeft(MODES[next].duration)
+      setFlash(false)
+    }, 300)
+  }
+
+  //  컨트롤 
+  function handleStartStop() {
+    setRunning(r => !r)
+  }
+
+  function handleReset() {
+    setRunning(false)
+    setTimeLeft(currentMode.duration)
+  }
+
+  /* 문서 타이틀 동기화 
+  useEffect(() => {
+    document.title = `${formatTime(timeLeft)} · ${currentMode.label}`
+  }, [timeLeft, currentMode.label])
+  */
+
+  //  렌더 
+  const isFocus = mode === 'focus'
+  const accentVar = isFocus ? 'var(--accent-focus)' : 'var(--accent-break)'
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className={`shell ${flash ? 'flash' : ''}`} data-mode={mode}>
+
+   
+
+      {/* 헤더 */}
+      <header className="header">
+        <span className="session-count">
+          {sessions > 0 && (
+            <>
+              {Array.from({ length: Math.min(sessions, 8) }).map((_, i) => (
+                <span key={i} className="pip" />
+              ))}
+            </>
+          )}
+        </span>
+      </header>
+
+      
+      {/* 타이머 디스플레이 */}
+      <main className="timer-area">
+        <div className="time-display" style={{ '--accent': accentVar }}>
+          {formatTime(timeLeft)}
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx 내 첫 프로젝트
-            </code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
+        <div className="time-label">{currentMode.label} 시간</div>
+      </main>
+
+      {/* 프로그레스 바 */}
+      <div className="progress-track">
+        <div
+          className="progress-fill"
+          style={{
+            width: `${progress * 100}%`,
+            background: accentVar,
+          }}
+        />
+        {/* 구간 마커 */}
+        {[0.25, 0.5, 0.75].map(p => (
+          <div
+            key={p}
+            className="progress-marker"
+            style={{ left: `${p * 100}%`, opacity: progress >= p ? 0 : 0.3 }}
+          />
+        ))}
+      </div>
+
+    
+
+      {/* 컨트롤 버튼 */}
+      <div className="controls">
+        <button className="btn btn-reset" onClick={handleReset} title="리셋">
+          <ResetIcon />
         </button>
-      </section>
 
-      <div className="ticks"></div>
+        <button
+          className={`btn btn-primary ${running ? 'running' : ''}`}
+          onClick={handleStartStop}
+          style={{ '--accent': accentVar }}
+        >
+          {running ? <PauseIcon /> : <PlayIcon />}
+          <span>{running ? '정지' : '시작'}</span>
+        </button>
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+        <button
+          className="btn btn-skip"
+          onClick={triggerModeSwitch}
+          title="건너뛰기"
+        >
+          <SkipIcon />
+        </button>
+      </div>
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+    </div>
   )
 }
 
-export default App
+//  아이콘 
+function PlayIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <polygon points="5,3 19,12 5,21" />
+    </svg>
+  )
+}
+
+function PauseIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <rect x="6" y="4" width="4" height="16" />
+      <rect x="14" y="4" width="4" height="16" />
+    </svg>
+  )
+}
+
+function ResetIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <polyline points="1 4 1 10 7 10" />
+      <path d="M3.51 15a9 9 0 1 0 .49-4.5" />
+    </svg>
+  )
+}
+
+function SkipIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <polygon points="5,4 15,12 5,20" />
+      <rect x="16" y="4" width="3" height="16" />
+    </svg>
+  )
+}
