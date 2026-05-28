@@ -19,6 +19,7 @@ const THEME = {
     accentBreakDim: 'rgba(154, 184, 232, 0.12)',
     btnBg: '#1f1f1f',
     btnBorder: '#2a2a2a',
+    overlay: 'rgba(0, 0, 0, 0.7)',
   },
   light: {
     bg: '#f0ede8',
@@ -33,6 +34,7 @@ const THEME = {
     accentBreakDim: 'rgba(42, 78, 122, 0.1)',
     btnBg: '#eeebe6',
     btnBorder: '#ddd9d2',
+    overlay: 'rgba(0, 0, 0, 0.3)',
   },
 }
 
@@ -53,6 +55,9 @@ export default function App() {
   const [sessions, setSessions] = useState(0)
   const [flash, setFlash] = useState(false)
   const [isDark, setIsDark] = useState(true)
+  
+  // 팝업 오픈 상태 관리 추가
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
 
   const intervalRef = useRef(null)
   const currentMode = MODES[mode]
@@ -112,9 +117,26 @@ export default function App() {
     setRunning(r => !r)
   }
 
-  function handleReset() {
+  function handleResetClick() {
+    
+    if (timeLeft === currentMode.duration && !running) return;
+  
+    //타이머 일시정지
+    
     setRunning(false)
+    setShowResetConfirm(true)
+  }
+
+  //  '초기화'를 눌렀을 때
+  function confirmReset() {
     setTimeLeft(currentMode.duration)
+    setShowResetConfirm(false)
+  }
+
+  // '취소'를 눌렀을 때
+  function cancelReset() {
+    setShowResetConfirm(false)
+    
   }
 
   useEffect(() => {
@@ -280,9 +302,9 @@ export default function App() {
           justifyContent: 'center',
           gap: '12px',
         }}>
-          {/* 리셋 */}
+          {/* 리셋 버튼 함수 변경 */}
           <button
-            onClick={handleReset}
+            onClick={handleResetClick}
             style={{
               width: '48px',
               height: '48px',
@@ -359,6 +381,80 @@ export default function App() {
             </svg>
           </button>
         </div>
+
+        {/* 팝업 컴포넌트  */}
+        {showResetConfirm && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: C.surface, 
+            borderRadius: '20px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+            zIndex: 10,
+            animation: 'fadeIn 0.2s ease',
+          }}>
+            <div style={{
+              fontSize: '16px',
+              fontWeight: 700,
+              color: C.text,
+              marginBottom: '8px',
+              textAlign: 'center',
+            }}>
+              타이머 초기화
+            </div>
+            <div style={{
+              fontSize: '13px',
+              color: C.textMuted,
+              marginBottom: '24px',
+              textAlign: 'center',
+            }}>
+              정말 진행 중인 타이머를 초기화하시겠습니까?
+            </div>
+            <div style={{ display: 'flex', gap: '10px', width: '100%', justifyContent: 'center' }}>
+              <button
+                onClick={cancelReset}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '10px',
+                  border: `1px solid ${C.border}`,
+                  background: C.surface2,
+                  color: C.text,
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  flex: 1,
+                  maxWidth: '120px',
+                }}
+              >
+                취소
+              </button>
+              <button
+                onClick={confirmReset}
+                style={{
+                  padding: '10px 20px',
+                  borderRadius: '10px',
+                  border: 'none',
+                  background: isFocus ? '#d9534f' : '#4a77a8', 
+                  fontWeight: 600,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  flex: 1,
+                  maxWidth: '120px',
+                  boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+                }}
+              >
+                초기화
+              </button>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>
